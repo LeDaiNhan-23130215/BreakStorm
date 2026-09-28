@@ -9,7 +9,21 @@ export class Paddle {
         this.speed = 500;
     }
 
-    update(dt) {
+    update(dt, input, maxWidth) {
+        if(input.left){
+            this.x -= dt * this.speed;
+        }
 
+        if(input.right) {
+            this.x += dt * this.speed;
+        }
+
+        if(this.x < 0) {
+            this.x = 0;
+        }
+
+        if(this.x + this.width > maxWidth) {
+            this.x = maxWidth - this.width;
+        }
     }
 }

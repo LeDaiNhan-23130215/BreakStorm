@@ -1,6 +1,7 @@
 import {Game} from './core/Game.js';
 import {GameLoop} from './core/GameLoop.js';
 import {Renderer} from './rendering/Renderer.js';
+import {Input} from './core/input.js';
 
 const canvas =
     document.querySelector('#game-canvas');
@@ -8,7 +9,8 @@ const canvas =
 canvas.width = 800;
 canvas.height = 600;
 
-const game = new Game();
+const input = new Input();
+const game = new Game(input);
 
 const renderer =
     new Renderer(canvas);

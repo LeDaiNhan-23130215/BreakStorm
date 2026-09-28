@@ -4,7 +4,7 @@ import { Collision } from '../system/collision.js';
 
 export class Game {
 
-    constructor() {
+    constructor(input) {
 
         this.width = 800;
         this.height = 600;
@@ -18,16 +18,22 @@ export class Game {
             this.width / 2 - 50,
             this.height - 40
         );
+
+        this.input = input;
     }
 
     update(dt) {
         this.ball.update(dt);
-        this.paddle.update(dt);
+        this.paddle.update(dt, this.input, this.width);
 
         Collision.ballWithWall(
             this.ball,
             this.width,
-            this.height
+        )
+
+        Collision.ballWithPaddle(
+            this.ball,
+            this.paddle
         )
     }
 }
