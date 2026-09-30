@@ -1,11 +1,11 @@
 import { Ball } from '../entities/Ball.js';
 import { Paddle } from '../entities/Paddle.js';
 import { Collision } from '../system/collision.js';
-
+import { Level } from '../level/level.js';
 export class Game {
 
     constructor(input) {
-
+        this.level = new Level();
         this.width = 800;
         this.height = 600;
 
@@ -35,5 +35,12 @@ export class Game {
             this.ball,
             this.paddle
         )
+
+        for (const brick of this.level.bricks) {
+            Collision.ballWithBrick(
+                this.ball,
+                brick
+            );
+        }
     }
 }

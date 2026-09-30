@@ -28,8 +28,19 @@ export class Collision {
             ball.y - ball.radius <= paddle.y + paddle.height
             && ball.y >= 0) {
 
-            console.log('HIT');
             ball.y = paddle.y - ball.radius;
+            ball.vy *= -1;
+        }
+    }
+
+    static ballWithBrick(ball, brick) {
+        if (ball.x + ball.radius >= brick.x &&
+            ball.x - ball.radius <= brick.x + brick.width &&
+            ball.y + ball.radius >= brick.y &&
+            ball.y - ball.radius <= brick.y + brick.height &&
+            brick.hp !== 0
+            ) {
+            brick.hit();
             ball.vy *= -1;
         }
     }

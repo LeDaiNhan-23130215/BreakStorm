@@ -9,15 +9,20 @@ body {
     color: white;
 }
 
-.game-container {
-    flex: 1;
+#game-header {
+    height: 20px;
+    margin: 5px;
+}
 
+.game {
+    flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
 #game-canvas {
+    margin: 0 auto;
     border: 2px solid white;
     background: #222;
 }
