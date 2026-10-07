@@ -10,7 +10,7 @@ export class Level {
             [1, 1, 1, 1, 0, 0, 0, 0],
             [1, 1, 1, 1, 0, 0, 0, 0],
             [1, 1, 1, 1, 0, 0, 0, 0],
-            [1, 1, 1, 2, 0, 0, 0, 0],
+            [1, 1, 1, -1, 0, 0, 0, 0],
         ]
 
         this.bricks = [];
@@ -28,7 +28,7 @@ export class Level {
             for (let col = 0; col < this.cols; col++) {
                 const x = col * (brickWidth + gap);
                 const y = row * (brickHeight + gap);
-                if (this.grid[row][col] >= 1) {
+                if (this.grid[row][col] !== 0) {
                     this.bricks.push(
                         new Brick(x, y, brickHeight, brickWidth, this.grid[row][col])
                     );

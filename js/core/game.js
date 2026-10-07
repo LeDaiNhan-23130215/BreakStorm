@@ -1,7 +1,8 @@
-import { Ball } from '../entities/Ball.js';
-import { Paddle } from '../entities/Paddle.js';
-import { Collision } from '../system/collision.js';
-import { Level } from '../level/level.js';
+import {Ball} from '../entities/Ball.js';
+import {Paddle} from '../entities/Paddle.js';
+import {Collision} from '../system/collision.js';
+import {Level} from '../level/level.js';
+
 export class Game {
 
     constructor(input) {
@@ -37,10 +38,12 @@ export class Game {
         )
 
         for (const brick of this.level.bricks) {
-            Collision.ballWithBrick(
+            if (Collision.ballWithBrick(
                 this.ball,
                 brick
-            );
+            )) {
+                break;
+            }
         }
     }
 }
