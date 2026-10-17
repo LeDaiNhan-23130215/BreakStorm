@@ -6,29 +6,128 @@
     <title>Break Storm</title>
     <link rel="stylesheet" href="resources/bootstrap/bootstrap-5.0.2-dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="css/game.css">
+    <link rel="stylesheet" href="resources/fontawesome-free-7.3.1-web/css/all.min.css">
 </head>
 <body>
 
 <header id="game-header">
     <div class="container">
-        <div class="row text-center align-items-center">
-            <div class="col-6">
-                <span>Score:</span>
-                <strong id="score">0</strong>
+        <div class="row text-center align-items-center justify-content-center">
+            <div id="hp-bar" class="col-5 mx-0 justify-content-end">
+                <div id="hp-wrapper" class="hp-bar">
+                    <span>HP:</span>
+                    <div class="progress">
+                        <div id="hp-progress" class="progress-bar" role="progressbar" aria-valuemax="100"
+                             aria-valuemin="0" aria-valuenow="100">100 / 100
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="col-6">
-                <span>Level:</span>
-                <strong id="level">1</strong>
+            <div id="break-wrapper" class="col-2 align-items-center justify-content-center">
+                <div class="break"></div>
+            </div>
+
+            <div id="xp-bar" class="col-5 mx-0 justify-content-start">
+                <div class="xp-bar">
+                    <span>XP:</span>
+                    <div class="progress">
+                        <div id="xp-progress" class="progress-bar" role="progressbar" aria-valuemax="100"
+                             aria-valuemin="0" aria-valuenow="0" style="width: 0%">
+                            0 / 100
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </header>
 
 <main class="content container game">
-    <canvas id="game-canvas" width="800" height="600"></canvas>
+    <div class="row">
+        <div class="col-2">
+            <div id="dash">
+                <strong>DASH</strong>
+                <div class="progress">
+                    <div id="dash-ready" class="progress-bar" role="progressbar" aria-valuemax="100" aria-valuemin="0"
+                         aria-valuenow="0" style="width: 0%"
+                    ></div>
+                </div>
+            </div>
+
+            <div id="power-up">
+                <strong>POWER UP</strong>
+                <div class="progress">
+                    <div id="power-up-ready" class="progress-bar" role="progressbar" aria-valuemax="100"
+                         aria-valuemin="0"
+                         aria-valuenow="0" style="width: 0%"
+                    ></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-8">
+            <div class="game-wrapper">
+                <canvas id="game-canvas" width="800" height="600"></canvas>
+
+                <div id="upgrade" class="upgrade d-none">
+
+                    <button id="up1" class="card">
+                        <div class="icon-wrapper">
+                            <div class="icon"><i class="fa-solid fa-image"></i></div>
+                        </div>
+
+                        <div class="card-info">
+                            <div class="card-title">CARD TITLE</div>
+                            <div class="card-rarity">COMMON</div>
+                            <div class="card-description">THIS IS A COMMON CARD</div>
+                        </div>
+
+                    </button>
+                    <button id="up2" class="card">
+                        <div class="icon-wrapper">
+                            <div class="icon"><i class="fa-solid fa-image"></i></div>
+                        </div>
+
+                        <div class="card-info">
+                            <div class="card-title">CARD TITLE</div>
+                            <div class="card-rarity">COMMON</div>
+                            <div class="card-description">THIS IS A COMMON CARD</div>
+                        </div>
+
+                    </button>
+                    <button id="up3" class="card">
+                        <div class="icon-wrapper">
+                            <div class="icon"><i class="fa-solid fa-image"></i></div>
+                        </div>
+
+                        <div class="card-info">
+                            <div class="card-title">CARD TITLE</div>
+                            <div class="card-rarity">COMMON</div>
+                            <div class="card-description">THIS IS A COMMON CARD</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-2">
+            <span>Lives:</span>
+            <strong id="lives">3</strong>
+
+            <span>Level:</span>
+            <strong id="level">1</strong>
+
+            <span>Score:</span>
+            <strong id="score">0</strong>
+
+            <span>Player Level:</span>
+            <strong id="player-level">1</strong>
+        </div>
+    </div>
 </main>
+
 <script src="resources/bootstrap/bootstrap-5.0.2-dist/js/bootstrap.min.js"></script>
-<script type="module" src="./js/main.js"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
