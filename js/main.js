@@ -6,7 +6,7 @@ const LEVELS = [
         [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
         [1, 1, 1, 1, 2, 2, 1, 1, 1, 1],
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [0, 1, 1, 5, 1, 1, 5, 1, 1, 0],
+        [0, 1, 1, 5, 1, 1, 5, 1, 3, 0],
         [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -48,6 +48,11 @@ const brickType = {
         hp: 10,
         type: 'brick-2',
         xp: 20
+    },
+    '3': {
+        hp: 10,
+        type: 'monster-1',
+        xp: 10
     },
     '5': {
         hp: 2,
@@ -263,6 +268,9 @@ class Brick {
         this.hp = hp;
         this.type = type;
         this.xp = xp;
+
+        this.shootCD = 5;
+        this.shootTimeLeft = 0;
     }
 
     alive() {
@@ -272,6 +280,50 @@ class Brick {
     hit(atk) {
         if (this.type === 'wall') return;
         this.hp = Math.max(0, this.hp - atk);
+    }
+
+    shootAmmo(){
+        if(this.type === 'monster-1') {
+            return new Bullet(this.x + this.width/2, this.y + this.height, 8, 5, 150);
+        }
+    }
+
+    update(dt) {
+        if(this.type === 'monster-1') {
+            if(this.shootTimeLeft <= 0) {
+                this.shootTimeLeft = this.shootCD;
+                return this.shootAmmo();
+            } else {
+                this.shootTimeLeft -= dt;
+            }
+        }
+    }
+}
+
+//Bullet
+class Bullet {
+    constructor(x, y, radius, damage, speed) {
+        this.x = x;
+        this.y = y;
+
+        this.vx = 0;
+        this.vy = 0;
+
+        this.speed = speed;
+
+        this.radius = radius;
+        this.damage = damage;
+
+        this.alive = true;
+    }
+
+    update(dt) {
+        this.vy = this.speed;
+        this.y += this.vy * dt;
+    }
+
+    bulletLost() {
+        this.alive = false;
     }
 }
 
@@ -467,6 +519,18 @@ class Collision {
         ball.vy = -ball.speed * (BC / AB);
     }
 
+    bulletWidthPaddle(bullet, paddle){
+        const hit =
+            bullet.x + bullet.radius >= paddle.x &&
+            bullet.x - bullet.radius <= paddle.x + paddle.width &&
+            bullet.y + bullet.radius >= paddle.y &&
+            bullet.y - bullet.radius <= paddle.y + paddle.height;
+
+        if(!hit) return;
+        bullet.bulletLost();
+        paddle.updateHp(-bullet.damage);
+    }
+
     ballWithBrick(ball, brick) {
         const hit
             = ball.x + ball.radius >= brick.x &&
@@ -615,6 +679,8 @@ class Game {
 
         this.tmpUpgrade = [];
         this.resetUpgrade();
+
+        this.ammos = [];
     }
 
     update(dt) {
@@ -668,6 +734,17 @@ class Game {
     }
 
     updatePlaying(dt, dash, powerUp) {
+        for (const brick of this.level.bricks) {
+            if(brick.alive()) {
+            let bullet = brick.update(dt);
+            if (bullet !== undefined) this.ammos.push(bullet)}
+        }
+
+        for(const bullet of this.ammos) {
+            bullet.update(dt);
+            this.collision.bulletWidthPaddle(bullet, this.paddle);
+        }
+
         for (const ball of this.balls) {
             ball.update(this.input, dt, powerUp);
             this.collision.ballWithWall(ball, this.width);
@@ -692,6 +769,7 @@ class Game {
         }
 
         this.balls = this.balls.filter(ball => ball.isAlive);
+        this.ammos = this.ammos.filter(bullet => bullet.alive);
         this.paddle.update(dt, this.input, this.width, dash);
 
         if (this.level.isCleared()) {
@@ -716,6 +794,7 @@ class Game {
         this.resetUpgrade();
         this.loadLevel(0);
         this.state = GameState.READY;
+        this.ammos = [];
     }
 
     onBallLost() {
@@ -741,11 +820,13 @@ class Game {
     loadLevel(index) {
         this.levelIndex = index;
         this.level = new Level(index);
+        this.ammos = [];
         this.resetBall();
     }
 
     resetBall() {
         this.paddle.x = this.width / 2 - this.paddle.width / 2;
+        this.ammos = [];
         this.balls = [new Ball(0, 0, this.ballAtk, this.ballPowerUpTime, this.ballPowerUpCD)];
         this.stickBallToPaddle();
         this.paddle.resetDash();
@@ -900,13 +981,24 @@ class Renderer {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
+    drawAmmo(ammos) {
+        for (const ammo of ammos)
+            if(ammo.alive) {
+            const ctx = this.ctx;
+            ctx.fillStyle = "red";
+            ctx.beginPath();
+            ctx.arc(ammo.x, ammo.y, ammo.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
     drawBall(balls) {
         for (const ball of balls) {
-            const ctx = this.ctx;
-            ctx.fillStyle = "white";
-            ctx.beginPath();
-            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-            ctx.fill();
+                const ctx = this.ctx;
+                ctx.fillStyle = "white";
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fill();
         }
     }
 
@@ -1193,6 +1285,7 @@ const loop = new GameLoop((dt) => {
         renderer.drawPaddle(game.paddle);
         renderer.drawBall(game.balls);
         renderer.drawOverlay(game);
+        renderer.drawAmmo(game.ammos);
     });
 
 loop.start();
