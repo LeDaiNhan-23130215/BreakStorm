@@ -11,13 +11,16 @@ const LEVELS = [
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     ],
+
     [
-        [2, 2, 1, 1, 1, 1, 1, 1, 2, 2],
-        [1, 3, 1, 1, 5, 5, 1, 1, 3, 1],
-        [1, 1, -1, 1, 1, 1, 1, -1, 1, 1],
-        [0, 1, 1, 4, 1, 1, 4, 1, 1, 0],
-        [0, 0, 1, 1, -1, -1, 1, 1, 0, 0],
-        [0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
+        [2, 4, 1, 1, 1, 1, 1, 1, 4, 2],
+        [3, 1, 3, 1, 1, 1, 1, 3, 1, 3],
+        [1, -1, 1, 1, 2, 2, 1, 1, -1, 1],
+        [0, 1, 4, 1, 1, 1, 1, 4, 1, 0],
+        [0, 1, 1, 5, 1, 1, 5, 1, 1, 0],
+        [0, 0, 1, -1, 1, 1, -1, 1, 0, 0],
+        [0, 0, 1, 2, 1, 1, 2, 1, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 0, 0, 0]
     ],
     [
         [2, 2, 2, 2, 2, 2, 2, 2],
@@ -48,23 +51,23 @@ const brickType = {
         shootCD: 0,
     },
     '2': {
-        hp: 10,
+        hp: 7,
         type: 'brick-2',
         xp: 20,
         shootCD: 0,
     },
     '3': {
-        hp: 5,
+        hp: 4,
         type: 'monster-1',
         xp: 10,
-        shootCD: 10,
+        shootCD: 6,
     },
 
     '4': {
         hp: 3,
         type: 'monster-2',
         xp: 10,
-        shootCD: 7,
+        shootCD: 5.5,
     },
     '5': {
         hp: 2,
@@ -72,6 +75,13 @@ const brickType = {
         xp: 10,
         shootCD: 0
     },
+};
+
+const dropOutType = {
+    heal: 'heal',
+    bonusXp: 'bonusXp',
+    multiBall: 'multiBall',
+    bonusLive: 'bonusLive'
 };
 
 
@@ -293,7 +303,7 @@ class Ball {
             this.isWizardBall = true;
         }
 
-        if(this.isWizardBall && click) {
+        if (this.isWizardBall && click) {
             this.wizardBall(input.mouseClickPos);
         }
 
@@ -357,7 +367,7 @@ class Brick {
     shootBullet(paddle) {
         switch (this.type) {
             case'monster-1':
-                return new Bullet(this.x + this.width / 2, this.y + this.height, paddle, 8, 5, 150, 0, 150, 'monster-1');
+                return new Bullet(this.x + this.width / 2, this.y + this.height, paddle, 8, 10, 175, 0, 150, 'monster-1');
             case'monster-2':
                 let desX = paddle.x + paddle.width / 2;
                 let desY = paddle.y;
@@ -370,7 +380,7 @@ class Brick {
 
                 let vx = speed * (BC / AB);
                 let vy = speed * (AC / AB);
-                return new Bullet(this.x + this.width / 2, this.y + this.height, paddle, 5, 3, 300, vx, vy, 'monster-2');
+                return new Bullet(this.x + this.width / 2, this.y + this.height, paddle, 5, 12, 260, vx, vy, 'monster-2');
         }
     }
 
@@ -483,6 +493,31 @@ class Paddle {
     }
 }
 
+//Drop out
+class DropOut {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 120;
+
+        this.radius = 10;
+
+        this.type = type;
+
+        this.alive = true;
+    }
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+    }
+
+    dropOutLost() {
+        this.alive = false;
+    }
+
+
+}
 //Level
 class Level {
     get total() {
@@ -619,6 +654,19 @@ class Collision {
         paddle.updateHp(-bullet.damage);
     }
 
+    dropOutWithPaddle(dropOut, paddle) {
+        const hit =
+            dropOut.x + dropOut.radius >= paddle.x &&
+            dropOut.x - dropOut.radius <= paddle.x + paddle.width &&
+            dropOut.y + dropOut.radius >= paddle.y &&
+            dropOut.y - dropOut.radius <= paddle.y + paddle.height;
+
+        if (!hit) return;
+        dropOut.dropOutLost();
+        return dropOut.type;
+    }
+
+
     ballWithBrick(ball, brick) {
         const hit
             = ball.x + ball.radius >= brick.x &&
@@ -659,6 +707,8 @@ class Collision {
         }
         return true;
     }
+
+
 }
 
 // Input
@@ -790,6 +840,8 @@ class Game {
         this.resetUpgrade();
 
         this.bullets = [];
+
+        this.dropOuts = [];
     }
 
     update(dt) {
@@ -859,6 +911,13 @@ class Game {
             if (bullet.y - bullet.radius > this.height) bullet.bulletLost();
         }
 
+        for (const dropOut of this.dropOuts) {
+            dropOut.update(dt);
+            const typeOfDrop = this.collision.dropOutWithPaddle(dropOut, this.paddle);
+            if(typeOfDrop !== undefined) this.handleDrop(typeOfDrop);
+            if (dropOut.y - dropOut.radius > this.height) dropOut.dropOutLost();
+        }
+
         for (const ball of this.balls) {
             ball.update(this.input, dt, powerUp, wizardBall, click);
             this.collision.ballWithWall(ball, this.width);
@@ -869,6 +928,8 @@ class Game {
 
                     if (!brick.alive()) {
                         this.xp += brick.xp;
+                        const dropOut = this.spawnDropOut(brick);
+                        if(dropOut !== undefined) this.dropOuts.push(dropOut);
                     }
 
                     if (brick.type === 'multiball' && !brick.alive()) {
@@ -884,6 +945,7 @@ class Game {
 
         this.balls = this.balls.filter(ball => ball.isAlive);
         this.bullets = this.bullets.filter(bullet => bullet.alive);
+        this.dropOuts = this.dropOuts.filter(dropOut => dropOut.alive);
         this.paddle.update(dt, this.input, this.width, dash);
 
         if (this.level.isCleared()) {
@@ -909,6 +971,7 @@ class Game {
         this.loadLevel(1);
         this.state = GameState.READY;
         this.bullets = [];
+        this.dropOuts = [];
     }
 
     onBallLost() {
@@ -1060,6 +1123,39 @@ class Game {
 
         this.tmpUpgrade = [];
     }
+
+    spawnDropOut(brick) {
+        const roll = Math.random();
+
+        if(roll < 0.4) {
+            return;
+        } else if(roll < 0.6) {
+            return new DropOut(brick.x + brick.width / 2, brick.y + brick.height / 2, dropOutType.heal);
+        } else if (roll < 0.7) {
+            return new DropOut(brick.x + brick.width / 2, brick.y + brick.height / 2, dropOutType.bonusXp);
+        } else if (roll < 0.8) {
+            return new DropOut(brick.x + brick.width / 2, brick.y + brick.height / 2, dropOutType.bonusLive);
+        } else if (roll < 0.9) {
+            return new DropOut(brick.x + brick.width / 2, brick.y + brick.height / 2, dropOutType.multiBall);
+        }
+    }
+
+    handleDrop(type) {
+        switch (type) {
+            case dropOutType.heal:
+                this.paddle.updateHp(20);
+                break;
+            case dropOutType.bonusXp:
+                this.xp += 50;
+                break;
+            case dropOutType.bonusLive:
+                this.lives += 1;
+                break;
+            case dropOutType.multiBall:
+                this.spawnMultiball(this.balls[0]);
+                break;
+        }
+    }
 }
 
 //Game Loop
@@ -1116,6 +1212,29 @@ class Renderer {
                 ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
                 ctx.fill();
             }
+    }
+    drawDropOuts(dropOuts) {
+        const ctx = this.ctx;
+        const colors = {heal: 'lime', bonusXp: 'gold', multiBall: 'purple', bonusLive: 'hotpink'};
+        for (const dropOut of dropOuts) {
+            switch(dropOut.type) {
+                case dropOutType.heal:
+                    ctx.fillStyle = 'lime';
+                    break;
+                case dropOutType.bonusXp:
+                    ctx.fillStyle = 'gold';
+                    break;
+                case dropOutType.bonusLive:
+                    ctx.fillStyle = 'hotpink';
+                    break;
+                case dropOutType.multiBall:
+                    ctx.fillStyle = 'purple';
+                    break;
+            }
+            ctx.beginPath();
+            ctx.arc(dropOut.x, dropOut.y, dropOut.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     drawBall(balls) {
@@ -1403,6 +1522,7 @@ const loop = new GameLoop((dt) => {
         renderer.drawBall(game.balls);
         renderer.drawOverlay(game);
         renderer.drawBullet(game.bullets);
+        renderer.drawDropOuts(game.dropOuts);
     });
 
 loop.start();
