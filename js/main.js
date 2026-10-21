@@ -202,7 +202,7 @@ class Ball {
         this.wizardBallCD = wizardBallCD;
 
         this.wizardBallTimeLeft = 0;
-        this.wizardBallCD = 0;
+        this.wizardBallCDLeft = 0;
     }
 
     /**
@@ -226,8 +226,8 @@ class Ball {
      */
 
     launch(mouse) {
-        let mouseX = mouse.x;
-        let mouseY = mouse.y;
+        const mouseX = mouse.x;
+        const mouseY = mouse.y;
 
         let AB = Math.sqrt(Math.pow(mouseX - this.x, 2) + Math.pow(mouseY - this.y, 2));
         let BC = mouseX - this.x;
@@ -240,6 +240,18 @@ class Ball {
         this.vy = -this.speed * (AC / AB);
     }
 
+    wizardBall(mouseClickPos) {
+        const mouseX = mouseClickPos.x;
+        const mouseY = mouseClickPos.y;
+
+        let AB = Math.sqrt(Math.pow(mouseX - this.x, 2) + Math.pow(mouseY - this.y, 2));
+        let BC = mouseX - this.x;
+        let AC = mouseY - this.y;
+
+        this.vx = this.speed * (BC / AB);
+        this.vy = this.speed * (AC / AB);
+    }
+
     reset(x, y) {
         this.x = x;
         this.y = y;
@@ -248,9 +260,10 @@ class Ball {
         this.stuck = true;
         this.isAlive = true;
         this.resetPowerUp();
+        this.resetWizardBall();
     }
 
-    update(input, dt, powerUp) {
+    update(input, dt, powerUp, wizardBall, click) {
         if (this.stuck) return;
 
         if (powerUp && this.powerUpTimeLeft <= 0 && this.powerUpCDleft <= 0 && !this.isPowerUp) {
@@ -273,6 +286,29 @@ class Ball {
             this.powerUpCDleft = Math.max(0, this.powerUpCDleft -= dt);
         }
 
+        if (wizardBall && this.wizardBallTimeLeft <= 0 && this.wizardBallCDLeft <= 0
+            && !this.isWizardBall) {
+            this.wizardBallTimeLeft = this.wizardBallTime;
+            this.wizardBallCDLeft = this.wizardBallCD;
+            this.isWizardBall = true;
+        }
+
+        if(this.isWizardBall && click) {
+            this.wizardBall(input.mouseClickPos);
+        }
+
+        if (this.wizardBallTimeLeft <= 0 && this.isWizardBall) {
+            this.resetWizardBall();
+        }
+
+        if (this.wizardBallTimeLeft > 0) {
+            this.wizardBallTimeLeft = Math.max(0, this.wizardBallTimeLeft -= dt);
+        }
+
+        if (this.wizardBallCDLeft > 0 && this.wizardBallTimeLeft <= 0) {
+            this.wizardBallCDLeft = Math.max(0, this.wizardBallCDLeft -= dt);
+        }
+
         this.x += this.vx * dt;
         this.y += this.vy * dt;
     }
@@ -286,6 +322,11 @@ class Ball {
         this.powerUpTimeLeft = 0;
         this.speed = this.baseSpeed;
         this.atk = this.baseAtk;
+    }
+
+    resetWizardBall() {
+        this.isWizardBall = false;
+        this.wizardBallTimeLeft = 0;
     }
 }
 
@@ -627,9 +668,11 @@ class Input {
         this.right = false;
         this.mouse = {x: canvas.width / 2, y: canvas.height / 2};
         this.actions = new Set();
+        this.mouseClickPos = {x: 0, y: 0};
 
         window.addEventListener('keydown', (event) => {
-            if (['Space', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'KeyA', 'KeyD', 'KeyW', 'Digit1', 'Digit2', 'Digit3'].includes(event.code)) {
+            if (['Space', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'KeyA', 'KeyD', 'KeyW', 'Digit1',
+                'Digit2', 'Digit3', 'KeyQ'].includes(event.code)) {
                 event.preventDefault();
             }
             if (event.repeat) return;
@@ -666,6 +709,9 @@ class Input {
                 case 'Digit3':
                     this.actions.add('pick2');
                     break;
+                case 'KeyQ':
+                    this.actions.add('wizardBall');
+                    break;
             }
         });
 
@@ -676,6 +722,17 @@ class Input {
 
         canvas.addEventListener('mousedown', () => {
             this.actions.add('confirm');
+            this.actions.add('click');
+
+            const rect = canvas.getBoundingClientRect();
+
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            const x = (event.clientX - rect.left) * scaleX;
+            const y = (event.clientY - rect.top) * scaleY;
+
+            this.mouseClickPos = {x, y};
         });
 
         canvas.addEventListener('mousemove', (event) => {
@@ -715,8 +772,13 @@ class Game {
         this.ballPowerUpTime = BALL_BASE.powerUpTime;
         this.ballPowerUpCD = BALL_BASE.powerUpCD;
 
+        this.wizardBallTime = BALL_BASE.wizardBallTime;
+        this.wizardBallCD = BALL_BASE.wizardBallCD;
+
+
         this.paddle = new Paddle(this.width / 2 - 50, this.height - 40);
-        this.balls = [new Ball(0, 0, this.ballAtk, this.ballPowerUpTime, this.ballPowerUpCD)];
+        this.balls = [new Ball(0, 0, this.ballAtk, this.ballPowerUpTime, this.ballPowerUpCD
+            , this.wizardBallTime, this.wizardBallCD)];
         this.level = null;
 
         this.collision = new Collision();
@@ -735,6 +797,9 @@ class Game {
         const pause = this.input.deleteAction('pause');
         const dash = this.input.deleteAction('dash');
         const powerUp = this.input.deleteAction('powerUp');
+        const wizardBall = this.input.deleteAction('wizardBall');
+        const click = this.input.deleteAction('click');
+
         let pick = -1;
         for (let i = 0; i < 3; i++) {
             if (this.input.deleteAction('pick' + i)) pick = i;
@@ -760,7 +825,7 @@ class Game {
                 if (pause) {
                     this.state = GameState.PAUSE;
                 } else {
-                    this.updatePlaying(dt, dash, powerUp);
+                    this.updatePlaying(dt, dash, powerUp, wizardBall, click);
                 }
                 break;
 
@@ -780,7 +845,7 @@ class Game {
         }
     }
 
-    updatePlaying(dt, dash, powerUp) {
+    updatePlaying(dt, dash, powerUp, wizardBall, click) {
         for (const brick of this.level.bricks) {
             if (brick.alive()) {
                 let bullet = brick.update(dt, this.paddle);
@@ -795,7 +860,7 @@ class Game {
         }
 
         for (const ball of this.balls) {
-            ball.update(this.input, dt, powerUp);
+            ball.update(this.input, dt, powerUp, wizardBall, click);
             this.collision.ballWithWall(ball, this.width);
             this.collision.ballWithPaddle(ball, this.paddle);
             for (const brick of this.level.bricks) {
@@ -837,7 +902,7 @@ class Game {
         this.score = 0;
         this.lives = INITIAL_LIVES;
         this.xp = 0;
-        this.xpScale = 100;
+        this.xpScale = 50;
         this.playerLevel = 1;
         this.paddle.reset();
         this.resetUpgrade();
@@ -888,13 +953,15 @@ class Game {
     }
 
     spawnMultiball(srcBall) {
-        let newBall1 = new Ball(srcBall.x, srcBall.y, this.ballAtk, this.ballPowerUpTime, this.ballPowerUpCD);
+        let newBall1 = new Ball(srcBall.x, srcBall.y, this.ballAtk, this.ballPowerUpTime, this.ballPowerUpCD
+            , this.wizardBallTime, this.wizardBallCD);
         newBall1.vx = -srcBall.vx / 2;
         newBall1.vy = srcBall.vy + (srcBall.vx / 2);
         newBall1.stuck = false;
         this.balls.push(newBall1);
 
-        let newBall2 = new Ball(srcBall.x, srcBall.y, this.ballAtk, this.ballPowerUpTime, this.ballPowerUpCD);
+        let newBall2 = new Ball(srcBall.x, srcBall.y, this.ballAtk, this.ballPowerUpTime, this.ballPowerUpCD
+            , this.wizardBallTime, this.wizardBallCD);
         newBall2.vx = -srcBall.vx * 2;
         newBall2.vy = srcBall.vy + (srcBall.vx / 2);
         newBall2.stuck = false;
