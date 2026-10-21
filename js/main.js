@@ -6,17 +6,18 @@ const LEVELS = [
         [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
         [1, 1, 1, 1, 2, 2, 1, 1, 1, 1],
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [0, 1, 1, 5, 1, 1, 5, 1, 3, 0],
+        [0, 1, 1, 5, 1, 1, 5, 1, 0, 0],
         [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     ],
     [
-        [2, 2, 2, 2, 2, 2, 2, 2],
-        [1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 0, 1, -1, -1, 1, 0, 1],
-        [1, 1, 1, 0, 0, 1, 1, 1],
-        [0, 1, 1, 1, 1, 1, 1, 0],
+        [2, 2, 1, 1, 1, 1, 1, 1, 2, 2],
+        [1, 3, 1, 1, 5, 5, 1, 1, 3, 1],
+        [1, 1, -1, 1, 1, 1, 1, -1, 1, 1],
+        [0, 1, 1, 4, 1, 1, 4, 1, 1, 0],
+        [0, 0, 1, 1, -1, -1, 1, 1, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
     ],
     [
         [2, 2, 2, 2, 2, 2, 2, 2],
@@ -37,27 +38,39 @@ const brickType = {
     '-1': {
         hp: -1,
         type: 'wall',
-        xp: 0
+        xp: 0,
+        shootCD: 0
     },
     '1': {
         hp: 1,
         type: 'brick',
-        xp: 5
+        xp: 5,
+        shootCD: 0,
     },
     '2': {
         hp: 10,
         type: 'brick-2',
-        xp: 20
+        xp: 20,
+        shootCD: 0,
     },
     '3': {
-        hp: 10,
+        hp: 5,
         type: 'monster-1',
-        xp: 10
+        xp: 10,
+        shootCD: 10,
+    },
+
+    '4': {
+        hp: 3,
+        type: 'monster-2',
+        xp: 10,
+        shootCD: 7,
     },
     '5': {
         hp: 2,
         type: 'multiball',
-        xp: 10
+        xp: 10,
+        shootCD: 0
     },
 };
 
@@ -142,11 +155,22 @@ const UPGRADES = {
 }
 
 const PADDLE_BASE = {width: 100, speed: 600, maxHp: 100, dashDistance: 100, dashCD: 5};
-const BALL_BASE = {atk: 1, powerUpTime: 5, powerUpCD: 10};
+const BALL_BASE =
+    {
+        atk: 1,
+        powerUpTime: 5,
+        powerUpCD: 10,
+
+        wizardBallTime: 5,
+        wizardBallCD: 30
+    };
 
 //Ball
 class Ball {
-    constructor(x, y, baseAtk = BALL_BASE.atk, basePowerUpTIme = BALL_BASE.powerUpTime, basePowerUpCD = BALL_BASE.powerUpCD) {
+    constructor(x, y, baseAtk = BALL_BASE.atk, basePowerUpTIme = BALL_BASE.powerUpTime,
+                basePowerUpCD = BALL_BASE.powerUpCD,
+                wizardBallTime = BALL_BASE.wizardBallTime,
+                wizardBallCD = BALL_BASE.wizardBallCD) {
         this.x = x;
         this.y = y;
 
@@ -161,7 +185,7 @@ class Ball {
 
         this.baseSpeed = 300;
         this.speed = this.baseSpeed;
-        this.powerUpSpeed = 600;
+        this.powerUpSpeed = 400;
 
         this.stuck = true;
         this.isAlive = true;
@@ -172,6 +196,13 @@ class Ball {
 
         this.powerUpTimeLeft = 0;
         this.powerUpCDleft = 0;
+
+        this.isWizardBall = false;
+        this.wizardBallTime = wizardBallTime;
+        this.wizardBallCD = wizardBallCD;
+
+        this.wizardBallTimeLeft = 0;
+        this.wizardBallCD = 0;
     }
 
     /**
@@ -260,7 +291,7 @@ class Ball {
 
 //Brick
 class Brick {
-    constructor(x, y, height, width, hp, type, xp) {
+    constructor(x, y, height, width, hp, type, xp, shootCD) {
         this.x = x;
         this.y = y;
         this.height = height;
@@ -269,8 +300,8 @@ class Brick {
         this.type = type;
         this.xp = xp;
 
-        this.shootCD = 5;
-        this.shootTimeLeft = 0;
+        this.shootCD = shootCD;
+        this.shootTimeLeft = Math.floor(Math.random() * this.shootCD);
     }
 
     alive() {
@@ -282,32 +313,44 @@ class Brick {
         this.hp = Math.max(0, this.hp - atk);
     }
 
-    shootAmmo(){
-        if(this.type === 'monster-1') {
-            return new Bullet(this.x + this.width/2, this.y + this.height, 8, 5, 150);
+    shootBullet(paddle) {
+        switch (this.type) {
+            case'monster-1':
+                return new Bullet(this.x + this.width / 2, this.y + this.height, paddle, 8, 5, 150, 0, 150, 'monster-1');
+            case'monster-2':
+                let desX = paddle.x + paddle.width / 2;
+                let desY = paddle.y;
+
+                let speed = 300;
+
+                let AB = Math.sqrt(Math.pow(desX - this.x, 2) + Math.pow(desY - this.y, 2));
+                let BC = desX - this.x;
+                let AC = desY - this.y;
+
+                let vx = speed * (BC / AB);
+                let vy = speed * (AC / AB);
+                return new Bullet(this.x + this.width / 2, this.y + this.height, paddle, 5, 3, 300, vx, vy, 'monster-2');
         }
     }
 
-    update(dt) {
-        if(this.type === 'monster-1') {
-            if(this.shootTimeLeft <= 0) {
-                this.shootTimeLeft = this.shootCD;
-                return this.shootAmmo();
-            } else {
-                this.shootTimeLeft -= dt;
-            }
+    update(dt, paddle) {
+        if (this.shootTimeLeft <= 0) {
+            this.shootTimeLeft = this.shootCD;
+            return this.shootBullet(paddle);
+        } else {
+            this.shootTimeLeft -= dt;
         }
     }
 }
 
 //Bullet
 class Bullet {
-    constructor(x, y, radius, damage, speed) {
+    constructor(x, y, paddle, radius, damage, speed, vx, vy, type) {
         this.x = x;
         this.y = y;
 
-        this.vx = 0;
-        this.vy = 0;
+        this.vx = vx;
+        this.vy = vy;
 
         this.speed = speed;
 
@@ -315,10 +358,13 @@ class Bullet {
         this.damage = damage;
 
         this.alive = true;
+        this.paddle = paddle;
+
+        this.type = type;
     }
 
     update(dt) {
-        this.vy = this.speed;
+        this.x += this.vx * dt;
         this.y += this.vy * dt;
     }
 
@@ -423,8 +469,9 @@ class Level {
                     const hp = brickType[this.grid[row][col]].hp;
                     const type = brickType[this.grid[row][col]].type;
                     const xp = brickType[this.grid[row][col]].xp;
+                    const shootCD = brickType[this.grid[row][col]].shootCD;
                     this.bricks.push(
-                        new Brick(x, y, brickHeight, brickWidth, hp, type, xp)
+                        new Brick(x, y, brickHeight, brickWidth, hp, type, xp, shootCD)
                     );
                 }
             }
@@ -519,14 +566,14 @@ class Collision {
         ball.vy = -ball.speed * (BC / AB);
     }
 
-    bulletWidthPaddle(bullet, paddle){
+    bulletWidthPaddle(bullet, paddle) {
         const hit =
             bullet.x + bullet.radius >= paddle.x &&
             bullet.x - bullet.radius <= paddle.x + paddle.width &&
             bullet.y + bullet.radius >= paddle.y &&
             bullet.y - bullet.radius <= paddle.y + paddle.height;
 
-        if(!hit) return;
+        if (!hit) return;
         bullet.bulletLost();
         paddle.updateHp(-bullet.damage);
     }
@@ -658,10 +705,10 @@ class Game {
 
         this.score = 0;
         this.lives = INITIAL_LIVES;
-        this.levelIndex = 0;
+        this.levelIndex = 1;
 
         this.xp = 0;
-        this.xpScale = 100;
+        this.xpScale = 50;
         this.playerLevel = 1;
 
         this.ballAtk = BALL_BASE.atk;
@@ -680,7 +727,7 @@ class Game {
         this.tmpUpgrade = [];
         this.resetUpgrade();
 
-        this.ammos = [];
+        this.bullets = [];
     }
 
     update(dt) {
@@ -735,14 +782,16 @@ class Game {
 
     updatePlaying(dt, dash, powerUp) {
         for (const brick of this.level.bricks) {
-            if(brick.alive()) {
-            let bullet = brick.update(dt);
-            if (bullet !== undefined) this.ammos.push(bullet)}
+            if (brick.alive()) {
+                let bullet = brick.update(dt, this.paddle);
+                if (bullet !== undefined) this.bullets.push(bullet)
+            }
         }
 
-        for(const bullet of this.ammos) {
+        for (const bullet of this.bullets) {
             bullet.update(dt);
             this.collision.bulletWidthPaddle(bullet, this.paddle);
+            if (bullet.y - bullet.radius > this.height) bullet.bulletLost();
         }
 
         for (const ball of this.balls) {
@@ -769,7 +818,7 @@ class Game {
         }
 
         this.balls = this.balls.filter(ball => ball.isAlive);
-        this.ammos = this.ammos.filter(bullet => bullet.alive);
+        this.bullets = this.bullets.filter(bullet => bullet.alive);
         this.paddle.update(dt, this.input, this.width, dash);
 
         if (this.level.isCleared()) {
@@ -792,9 +841,9 @@ class Game {
         this.playerLevel = 1;
         this.paddle.reset();
         this.resetUpgrade();
-        this.loadLevel(0);
+        this.loadLevel(1);
         this.state = GameState.READY;
-        this.ammos = [];
+        this.bullets = [];
     }
 
     onBallLost() {
@@ -810,6 +859,7 @@ class Game {
     onLevelCleared() {
         if (this.levelIndex + 1 < this.level.total) {
             this.loadLevel(this.levelIndex + 1);
+            this.paddle.hp = this.paddle.maxHp;
             this.lives = 3;
             this.state = GameState.READY;
         } else {
@@ -820,13 +870,13 @@ class Game {
     loadLevel(index) {
         this.levelIndex = index;
         this.level = new Level(index);
-        this.ammos = [];
+        this.bullets = [];
         this.resetBall();
     }
 
     resetBall() {
         this.paddle.x = this.width / 2 - this.paddle.width / 2;
-        this.ammos = [];
+        this.bullets = [];
         this.balls = [new Ball(0, 0, this.ballAtk, this.ballPowerUpTime, this.ballPowerUpCD)];
         this.stickBallToPaddle();
         this.paddle.resetDash();
@@ -853,7 +903,7 @@ class Game {
 
     levelUp() {
         if (this.state === GameState.PLAYING || this.state === GameState.READY) {
-            if(this.xp >= this.xpScale) {
+            if (this.xp >= this.xpScale) {
                 this.playerLevel += 1;
                 this.paddle.maxHp += 10;
                 this.paddle.hp = this.paddle.maxHp;
@@ -928,7 +978,7 @@ class Game {
 
     pickUpgrade(upgradeIndex) {
         const upgrade = this.tmpUpgrade[upgradeIndex];
-        if(upgrade === undefined) return;
+        if (upgrade === undefined) return;
         upgrade.currentLevel += 1;
         this.applyUpgrade();
         this.state = this.tmpState;
@@ -981,24 +1031,33 @@ class Renderer {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
-    drawAmmo(ammos) {
-        for (const ammo of ammos)
-            if(ammo.alive) {
-            const ctx = this.ctx;
-            ctx.fillStyle = "red";
-            ctx.beginPath();
-            ctx.arc(ammo.x, ammo.y, ammo.radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
+    drawBullet(bullets) {
+        for (const bullet of bullets)
+            if (bullet.alive) {
+                const ctx = this.ctx;
+
+                switch (bullet.type) {
+                    case 'monster-1':
+                        ctx.fillStyle = "red";
+                        break;
+                    case 'monster-2':
+                        ctx.fillStyle = "yellow";
+                        break;
+                }
+
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
     }
 
     drawBall(balls) {
         for (const ball of balls) {
-                const ctx = this.ctx;
-                ctx.fillStyle = "white";
-                ctx.beginPath();
-                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-                ctx.fill();
+            const ctx = this.ctx;
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
         }
     }
 
@@ -1032,15 +1091,26 @@ class Renderer {
             if (!brick.alive()) {
                 continue;
             }
-
-            if (brick.type === 'wall') {
-                ctx.fillStyle = "gray";
-            } else if (brick.type === 'brick-2') {
-                ctx.fillStyle = "blue";
-            } else {
-                ctx.fillStyle = "#0d6efd";
+            switch (brick.type) {
+                case 'wall':
+                    ctx.fillStyle = ' gray';
+                    break;
+                case 'brick':
+                    ctx.fillStyle = "#0d6efd";
+                    break;
+                case 'brick-2':
+                    ctx.fillStyle = "blue";
+                    break;
+                case 'monster-1':
+                    ctx.fillStyle = "red";
+                    break;
+                case 'monster-2':
+                    ctx.fillStyle = "yellow";
+                    break;
+                case 'multiball':
+                    ctx.fillStyle = "purple";
+                    break;
             }
-
             ctx.fillRect(brick.x,
                 brick.y,
                 brick.width,
@@ -1145,7 +1215,6 @@ class UIManager {
     }
 
     update(game) {
-        this.showHpBar(game)
         this.setText(this.score, game.score);
         this.setText(this.level, game.levelIndex + 1);
         this.setText(this.lives, game.lives);
@@ -1198,24 +1267,6 @@ class UIManager {
         this.dashReady.setAttribute('aria-valuenow', String(percent));
     }
 
-    showHpBar(game) {
-        const currentLevel = game.levelIndex;
-
-        if (currentLevel <= 0) {
-            this.hpBar.classList.add("d-none");
-            this.breakBar.classList.add("d-none");
-        } else {
-            this.hpBar.classList.remove("d-none");
-            this.hpBar.classList.add("col-5");
-
-            this.breakBar.classList.add("col-2");
-            this.breakBar.classList.remove("d-none");
-
-            this.xpBar.classList.add("col-5");
-        }
-
-    }
-
     setHpProgress(game) {
         const hp = Math.max(0, Math.round(game.paddle.hp));
         const maxHp = game.paddle.maxHp;
@@ -1242,14 +1293,13 @@ class UIManager {
         } else {
             this.upgrade.classList.remove('d-none');
 
-            this.cards.forEach(((card, i) =>  {
+            this.cards.forEach(((card, i) => {
                 const up = game.tmpUpgrade[i];
-                if(up === undefined) {
+                if (up === undefined) {
                     card.classList.add('d-none');
                     return;
                 }
-                card.querySelector('.card-title').textContent= up.title;
-                card.querySelector('.card-rarity').textContent = up.rarity;
+                card.querySelector('.card-title').textContent = up.title;
                 card.querySelector('.card-description').textContent = up.description;
                 card.querySelector('.icon i').className = `fa-solid ${up.icon}`;
             }));
@@ -1285,7 +1335,7 @@ const loop = new GameLoop((dt) => {
         renderer.drawPaddle(game.paddle);
         renderer.drawBall(game.balls);
         renderer.drawOverlay(game);
-        renderer.drawAmmo(game.ammos);
+        renderer.drawBullet(game.bullets);
     });
 
 loop.start();
